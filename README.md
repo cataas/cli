@@ -13,7 +13,17 @@ The picture is drawn directly in the terminal:
 
 ## Install
 
-With Go 1.22+:
+On Linux or macOS (amd64 / arm64):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cataas/cli/main/install.sh | bash
+```
+
+The script downloads the matching prebuilt binary from [`bin/`](bin), checks its SHA-256 and
+installs it in `/usr/local/bin` (or `~/.local/bin` when not writable).
+Set `CATAAS_INSTALL_DIR` to choose another directory, or `CATAAS_REF` to install from a branch or tag.
+
+You can also download a binary from [`bin/`](bin) yourself, or build it with Go 1.22+:
 
 ```bash
 go install github.com/cataas/cli/cmd/cataas@latest
@@ -84,4 +94,10 @@ When the output is not a terminal (pipe or redirection), the raw picture is writ
 
 ```bash
 make test
+```
+
+After changing the code, rebuild the committed binaries (and their `SHA256SUMS`) before committing:
+
+```bash
+make dist VERSION=x.y.z
 ```
