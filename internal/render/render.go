@@ -19,6 +19,7 @@ import (
 	"image/png"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -63,9 +64,11 @@ func Detect(getenv func(string) string) Mode {
 
 // Options controls how an image is drawn.
 type Options struct {
-	Mode    Mode
-	Columns int // width of the picture, in terminal cells
-	MaxRows int // blocks mode: shrink the picture to fit this many lines (0 = no limit)
+	Mode Mode
+	// The picture is scaled, keeping its aspect ratio, to fit in a box of
+	// Columns × Rows terminal cells. Rows == 0 means no height limit.
+	Columns int
+	Rows    int
 	Loops   int // how many times animated GIFs are played (blocks mode); 0 means once
 }
 
@@ -82,13 +85,13 @@ func Render(ctx context.Context, w io.Writer, data []byte, opts Options) error {
 	switch mode {
 	case ModeITerm:
 		// iTerm2 decodes (and animates) the original file itself.
-		return writeITerm(w, data, opts.Columns)
+		return writeITerm(w, data, opts.Columns, opts.Rows)
 	case ModeKitty:
 		img, _, err := image.Decode(bytes.NewReader(data))
 		if err != nil {
 			return fmt.Errorf("decoding image: %w", err)
 		}
-		return writeKitty(w, img, opts.Columns)
+		return writeKitty(w, img, fitColumns(img.Bounds(), opts.Columns, opts.Rows))
 	default:
 		if isGIF(data) {
 			g, err := gif.DecodeAll(bytes.NewReader(data))
@@ -100,7 +103,7 @@ func Render(ctx context.Context, w io.Writer, data []byte, opts Options) error {
 		if err != nil {
 			return fmt.Errorf("decoding image: %w", err)
 		}
-		cols := fitColumns(img.Bounds(), opts.Columns, opts.MaxRows)
+		cols := fitColumns(img.Bounds(), opts.Columns, opts.Rows)
 		_, err = io.WriteString(w, Blocks(img, cols))
 		return err
 	}
@@ -110,8 +113,8 @@ func isGIF(data []byte) bool {
 	return bytes.HasPrefix(data, []byte("GIF87a")) || bytes.HasPrefix(data, []byte("GIF89a"))
 }
 
-// fitColumns reduces columns so that a picture of size b drawn with Blocks
-// takes at most maxRows lines.
+// fitColumns reduces columns so that a picture of size b takes at most
+// maxRows lines, assuming terminal cells are twice as tall as wide.
 func fitColumns(b image.Rectangle, columns, maxRows int) int {
 	if maxRows <= 0 || b.Dx() == 0 || b.Dy() == 0 {
 		return columns
@@ -187,7 +190,7 @@ func scale(img image.Image, w, h int) []color.RGBA {
 
 func animateBlocks(ctx context.Context, w io.Writer, g *gif.GIF, opts Options) error {
 	frames := composeGIF(g)
-	cols := fitColumns(frames[0].Bounds(), opts.Columns, opts.MaxRows)
+	cols := fitColumns(frames[0].Bounds(), opts.Columns, opts.Rows)
 	loops := max(opts.Loops, 1)
 	lines := 0
 	io.WriteString(w, "\x1b[?25l")       // hide cursor
@@ -251,9 +254,14 @@ func composeGIF(g *gif.GIF) []image.Image {
 }
 
 // writeITerm uses the iTerm2 inline images protocol.
-func writeITerm(w io.Writer, data []byte, columns int) error {
-	_, err := fmt.Fprintf(w, "\x1b]1337;File=inline=1;size=%d;width=%d;preserveAspectRatio=1:%s\a\n",
-		len(data), columns, base64.StdEncoding.EncodeToString(data))
+// The terminal fits the picture in the columns × rows box, keeping its ratio.
+func writeITerm(w io.Writer, data []byte, columns, rows int) error {
+	height := "auto"
+	if rows > 0 {
+		height = strconv.Itoa(rows)
+	}
+	_, err := fmt.Fprintf(w, "\x1b]1337;File=inline=1;size=%d;width=%d;height=%s;preserveAspectRatio=1:%s\a\n",
+		len(data), columns, height, base64.StdEncoding.EncodeToString(data))
 	return err
 }
 

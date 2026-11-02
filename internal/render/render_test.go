@@ -126,3 +126,34 @@ func TestAnimatedGIF(t *testing.T) {
 		t.Errorf("cursor moved up %d times, want 5", n)
 	}
 }
+
+func TestRenderFitsBox(t *testing.T) {
+	var data bytes.Buffer
+	png.Encode(&data, solid(400, 300, color.White)) // 4:3
+	ctx := context.Background()
+
+	var out bytes.Buffer
+	Render(ctx, &out, data.Bytes(), Options{Mode: ModeBlocks, Columns: 40})
+	if lines := strings.Count(out.String(), "\n"); lines != 15 {
+		t.Errorf("width 40: got %d lines, want 15", lines)
+	}
+
+	out.Reset()
+	Render(ctx, &out, data.Bytes(), Options{Mode: ModeBlocks, Columns: 100, Rows: 6})
+	lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
+	if len(lines) != 6 || strings.Count(lines[0], "▀") != 16 {
+		t.Errorf("box 100x6: got %d lines of %d cells, want 6 of 16", len(lines), strings.Count(lines[0], "▀"))
+	}
+
+	out.Reset()
+	Render(ctx, &out, data.Bytes(), Options{Mode: ModeITerm, Columns: 30, Rows: 8})
+	if !strings.Contains(out.String(), "width=30;height=8;preserveAspectRatio=1") {
+		t.Errorf("iterm: %q", out.String()[:80])
+	}
+
+	out.Reset()
+	Render(ctx, &out, data.Bytes(), Options{Mode: ModeKitty, Columns: 100, Rows: 6})
+	if !strings.Contains(out.String(), ",c=16,") {
+		t.Errorf("kitty: %q", out.String()[:40])
+	}
+}

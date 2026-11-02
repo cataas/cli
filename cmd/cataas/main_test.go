@@ -90,3 +90,25 @@ func TestMixedFlagsAndTags(t *testing.T) {
 		t.Fatalf("got %q, %v", out, err)
 	}
 }
+
+func TestDisplayBox(t *testing.T) {
+	cases := []struct{ w, h, wantCols, wantRows int }{
+		{0, 0, 100, 48},  // default: terminal size, max 100 columns
+		{40, 0, 40, 0},   // width only: height follows the aspect ratio
+		{0, 10, 200, 10}, // height only: width limited by the terminal
+		{40, 10, 40, 10}, // both: fit in the box
+	}
+	for _, c := range cases {
+		cols, rows := displayBox(c.w, c.h, 200, 50)
+		if cols != c.wantCols || rows != c.wantRows {
+			t.Errorf("displayBox(%d, %d) = %d, %d; want %d, %d", c.w, c.h, cols, rows, c.wantCols, c.wantRows)
+		}
+	}
+}
+
+func TestImageSizeFlags(t *testing.T) {
+	out, err := exec(t, "--base-url", "https://x.test", "--url", "--image-width", "300", "--width", "20", "--height", "5")
+	if err != nil || out != "https://x.test/cat?width=300\n" {
+		t.Fatalf("got %q, %v", out, err)
+	}
+}

@@ -56,6 +56,7 @@ cataas version                 print the version
 | `cataas --filter custom --r 7 --g 12 --b 50` | a cat with tinted colours |
 | `cataas --id 595f280c557291a9750ebf80` | a specific cat |
 | `cataas --output cat.jpg` or `cataas > cat.jpg` | save the picture |
+| `cataas --width 40` / `cataas --height 10` | a cat 40 columns wide / 10 rows high |
 | `cataas --url --says hi` | print the picture URL without downloading it |
 | `cataas tags cat` | tags containing "cat" |
 | `cataas list --tag cute --limit 5 --json` | cats metadata as JSON |
@@ -70,16 +71,20 @@ cataas version                 print the version
 | `-s, --says` | text written on the picture |
 | `--font`, `--font-size`, `--font-color`, `--font-background` | text style |
 | `--type` | `xsmall`, `small`, `medium` or `square` |
-| `--width`, `--height`, `--fit`, `--position` | server-side resize |
+| `--image-width`, `--image-height`, `--fit`, `--position` | server-side resize, in pixels |
 | `--blur` | blur radius |
 | `--filter` | `mono`, `negate` or `custom` |
 | `--r`, `--g`, `--b`, `--brightness`, `--saturation`, `--hue`, `--lightness` | adjustments for `--filter custom` |
 | `-o, --output` | save to a file (`-` for stdout) |
 | `--url` | only print the URL |
-| `--cols` | width in terminal columns (default: fits the terminal, max 100) |
+| `-w, --width` | maximum width in terminal columns (default: terminal width, max 100) |
+| `-H, --height` | maximum height in terminal rows (default: terminal height) |
 | `--mode` | `auto`, `kitty`, `iterm` or `blocks` |
 | `--loops` | how many times animated cats play in `blocks` mode (default 3) |
 | `--base-url` | API base URL |
+
+The picture always keeps its aspect ratio: with `--width` only, its height follows; with `--height` only,
+its width follows; with both, it fits in the `width × height` box (`cataas -w 40 -H 15`).
 
 When the output is not a terminal (pipe or redirection), the raw picture is written instead of being drawn.
 

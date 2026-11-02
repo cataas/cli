@@ -137,8 +137,8 @@ func runShow(ctx context.Context, args []string, stdout, stderr io.Writer) error
 	fs.StringVar(&req.FontColor, "font-color", "", "text `color` (name or #hex)")
 	fs.StringVar(&req.FontBackground, "font-background", "", "text background `color`")
 	fs.StringVar(&req.Type, "type", "", "picture `type`: "+strings.Join(cataas.Types, ", "))
-	fs.IntVar(&req.Width, "width", 0, "resize the picture to this `width` in pixels")
-	fs.IntVar(&req.Height, "height", 0, "resize the picture to this `height` in pixels")
+	fs.IntVar(&req.Width, "image-width", 0, "server-side resize to this `width` in pixels")
+	fs.IntVar(&req.Height, "image-height", 0, "server-side resize to this `height` in pixels")
 	fs.StringVar(&req.Fit, "fit", "", "resize `mode`: "+strings.Join(cataas.Fits, ", "))
 	fs.StringVar(&req.Position, "position", "", "resize `anchor` (center, top, right top, ...)")
 	fs.IntVar(&req.Blur, "blur", 0, "blur `radius`")
@@ -154,7 +154,10 @@ func runShow(ctx context.Context, args []string, stdout, stderr io.Writer) error
 	output := fs.String("output", "", "save the picture to `file` instead of displaying it (\"-\" for stdout)")
 	fs.StringVar(output, "o", "", "shorthand for --output")
 	printURL := fs.Bool("url", false, "only print the picture URL")
-	columns := fs.Int("cols", 0, "picture width in terminal `columns` (default: terminal width, max 100)")
+	columns := fs.Int("width", 0, "maximum picture width in terminal `columns` (default: terminal width, max 100)")
+	fs.IntVar(columns, "w", 0, "shorthand for --width")
+	rows := fs.Int("height", 0, "maximum picture height in terminal `rows` (default: terminal height)")
+	fs.IntVar(rows, "H", 0, "shorthand for --height")
 	mode := fs.String("mode", envOr("CATAAS_MODE", "auto"), "render `mode`: auto, kitty, iterm, blocks (env CATAAS_MODE)")
 	loops := fs.Int("loops", 3, "how many times animated cats are played in blocks mode")
 
@@ -198,19 +201,30 @@ func runShow(ctx context.Context, args []string, stdout, stderr io.Writer) error
 		return nil
 	}
 
-	width, height := terminalSize(stdout)
-	cols := *columns
-	maxRows := 0
-	if cols <= 0 {
-		cols = min(width, 100)
-		maxRows = height - 2
-	}
+	termCols, termRows := terminalSize(stdout)
+	cols, maxRows := displayBox(*columns, *rows, termCols, termRows)
 	return render.Render(ctx, stdout, img.Data, render.Options{
 		Mode:    renderMode,
 		Columns: cols,
-		MaxRows: maxRows,
+		Rows:    maxRows,
 		Loops:   *loops,
 	})
+}
+
+// displayBox returns the box (columns × rows) the picture must fit in, from
+// the --width / --height options (0 when unset) and the terminal size.
+// The picture keeps its aspect ratio inside that box.
+func displayBox(width, height, termCols, termRows int) (int, int) {
+	switch {
+	case width > 0 && height > 0:
+		return width, height
+	case width > 0:
+		return width, 0 // only the width is constrained
+	case height > 0:
+		return termCols, height // avoid wrapping lines
+	default:
+		return min(termCols, 100), max(termRows-2, 1)
+	}
 }
 
 func runTags(ctx context.Context, args []string, stdout, stderr io.Writer) error {
